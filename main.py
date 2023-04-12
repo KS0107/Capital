@@ -12,13 +12,25 @@ TOKEN = "MTA5NTc5NDE4MDA0NDg4MjA4Mg.GCZRfu.x7OhE1qkstqgitYMNh3IDKGRSWZopY2PZ34O_
 
 print("Starting bot...")
 # Set up the bot client
-bot = commands.Bot(command_prefix='!')
+bot = commands.Bot(command_prefix='@')
 
 # Example command
 @bot.command()
 async def ping(ctx):
-    print("Pong!")
-    await ctx.send('Pong!')
+    start_time = time.monotonic()
+    message = await ctx.send("Pinging...")
+    end_time = time.monotonic()
+    response_time = (end_time - start_time) * 1000  # Convert to milliseconds
+
+    embed = discord.Embed(
+        title="🏓 Pong!",
+        description=f"Latency: {response_time:.2f}ms",
+        color=discord.Color.blurple()
+    )
+    print(f"Ping, Latency: {response_time:.2f}ms")
+
+    await message.edit(content=None, embed=embed)
+
 
 # Another example command
 @bot.command()
@@ -27,12 +39,12 @@ async def hello(ctx):
 
 # Command to send message to specified channel
 @bot.command()
-async def send(ctx, channel_id: int, *, message):
+async def announce(ctx, channel_id: int, title: str, *, message: str):
     channel = bot.get_channel(channel_id)
-    if channel:
-        await channel.send(message)
-    else:
-        await ctx.send(f"Channel with ID {channel_id} not found.")
+    embed = discord.Embed(title=title, description=message, color=discord.Color.blurple())
+    await channel.send(embed=embed)
+
+
 
 @bot.command()
 async def numusers(ctx):
@@ -116,7 +128,7 @@ async def messagestats(ctx):
 
     await ctx.send(embed=embed)
 @bot.command()
-async def usercountgraph(ctx):
+async def ucg(ctx):
     print("Generating user count graph...")
     await ctx.send("Generating user count graph...")
     user_counts = []
@@ -129,13 +141,13 @@ async def usercountgraph(ctx):
     fig, ax = plt.subplots()
     ax.plot(range(1, 31), user_counts, color='turquoise')
     ax.set(xlabel='Days', ylabel='User Count', title='User Count Over Last 30 Days')
-    ax.set_facecolor('#282b30')
+    ax.set_facecolor('#424549')
     ax.grid(color='white')
     ax.tick_params(colors='white')
 
     # Save the figure to a buffer
     buf = io.BytesIO()
-    fig.savefig(buf, format='png', facecolor='#282b30')
+    fig.savefig(buf, format='png', facecolor='#424549')
     buf.seek(0)
 
     # Create the discord embed
@@ -147,7 +159,7 @@ async def usercountgraph(ctx):
 
 
 @bot.command()
-async def messagecountgraph(ctx):
+async def mcg(ctx):
     print('Generating message count graph...')
     await ctx.send('Generating message count graph...')
     message_counts = []
@@ -165,13 +177,13 @@ async def messagecountgraph(ctx):
     fig, ax = plt.subplots()
     ax.plot(range(1, 31), message_counts, color='turquoise')
     ax.set(xlabel='Days', ylabel='Message Count', title='Message Count Over Last 30 Days')
-    ax.set_facecolor('#282b30')
+    ax.set_facecolor('#424549')
     ax.grid(color='white')
     ax.tick_params(colors='white')
 
     # Save the figure to a buffer
     buf = io.BytesIO()
-    fig.savefig(buf, format='png', facecolor='#282b30')
+    fig.savefig(buf, format='png', facecolor='#424549')
     buf.seek(0)
 
     # Create the discord embed
@@ -182,22 +194,24 @@ async def messagecountgraph(ctx):
     await ctx.send(file=file, embed=embed)
 
 
-
-@bot.command()
-async def commands(ctx):
-    await ctx.send(f"Available commands:\n"
-                   f"!ping - Pings the bot\n"
-                   f"!hello - Says hello to the user\n"
-                   f"!send <channel_id> <message> - Sends a message to the specified channel\n"
-                   f"!stats - Shows server statistics\n"
-                   f"!commands - Lists available commands and their usage")
-
 @bot.command()
 async def commandhelp(ctx):
-    await ctx.send(f"Instructions:\n"
-                   f"1. Use the command prefix '!' followed by a command to use the bot\n"
-                   f"2. Use the 'help' command to see this message\n"
-                   f"3. Use the 'commands' command to see available commands and their usage")
+    embed = discord.Embed(
+        title="Bot Commands Help",
+        description="A brief explanation of every command and its usage.",
+        color=discord.Color.blurple()
+    )
+    embed.add_field(name="ping", value="Tests the bot's latency.", inline=False)
+    embed.add_field(name="hello", value="Greets the user.", inline=False)
+    embed.add_field(name="announce [channel_id] [title] [message]", value="Sends an announcement to the specified channel with the given title and message.", inline=False)
+    embed.add_field(name="numusers", value="Displays the total number of members in the server.", inline=False)
+    embed.add_field(name="activeusers", value="Displays the number of active users in the last 30 days.", inline=False)
+    embed.add_field(name="stats", value="Displays server statistics, including total members, active members in the last 30 days, total messages, unique authors, and average messages per author.", inline=False)
+    embed.add_field(name="messagestats", value="Displays message statistics, including total messages sent, top authors by message count, and top channels by message count.", inline=False)
+    embed.add_field(name="ucg", value="Displays a graph of the number of new users who joined the server over the last 30 days.", inline=False)
+    embed.add_field(name="mcg", value="Displays a graph of the number of messages sent in the current channel over the last 30 days.", inline=False)
+
+    await ctx.send(embed=embed)
 
 @bot.event
 async def on_ready():
@@ -233,7 +247,6 @@ async def on_message(message):
     # Allow other commands to be processed
     await bot.process_commands(message)
 
-
 # SPAM CHECKER
 SPAM_THRESHOLD = 5  # number of messages allowed in the time window
 SPAM_TIME = 5      # time window in seconds
@@ -263,6 +276,24 @@ async def on_message(message):
     # Process the message normally if it's not spam
     await bot.process_commands(message)
     
+    
+@bot.command()
+@commands.has_role("Mod")
+async def manage(ctx, action, user_id:int, *, reason):
+    guild = ctx.guild
+    user = await bot.fetch_user(user_id)
+    if action == 'kick':
+        embed = discord.Embed(title=f"You have been kicked from {guild.name}!", description=f"Reason: {reason}", color=0xff5733)
+        await user.send(embed=embed)
+        await guild.kick(user, reason=reason)
+        
+    elif action == 'ban':
+        embed = discord.Embed(title=f"You have been banned from {guild.name}!", description=f"Reason: {reason}", color=0xff5733)
+        await user.send(embed=embed)
+        await guild.ban(user, reason=reason)
+    else:
+        await ctx.send("Invalid action. Please enter either 'kick' or 'ban' as the first argument.")
+        return
     
 # Run the bot
 bot.run(TOKEN)
