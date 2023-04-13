@@ -15,7 +15,7 @@ TOKEN = "MTA5NTc5NDE4MDA0NDg4MjA4Mg.GCZRfu.x7OhE1qkstqgitYMNh3IDKGRSWZopY2PZ34O_
 print("Starting bot...")
 # Set up the bot client
 intents = discord.Intents.all()  # Include all the intents
-bot = commands.Bot(command_prefix='@', intents=intents)
+bot = commands.Bot(command_prefix='^', intents=intents)
 
 
 # Example command
@@ -180,7 +180,7 @@ async def ucg(ctx):
 
   # Create the discord embed
   embed = discord.Embed(title='User Count Over Last 30 Days',
-                        color=discord.Color.green())
+                        color=discord.Color.blurple())
   file = discord.File(buf, filename='user_count.png')
   embed.set_image(url=f'attachment://user_count.png')
 
@@ -231,47 +231,37 @@ async def mcg(ctx):
 
 
 @bot.command()
-async def commandhelp(ctx):
-  embed = discord.Embed(
-    title="Bot Commands Help",
-    description="A brief explanation of every command and its usage.",
-    color=discord.Color.blurple())
-  embed.add_field(name="ping", value="Tests the bot's latency.", inline=False)
-  embed.add_field(name="hello", value="Greets the user.", inline=False)
-  embed.add_field(
-    name="announce [channel_id] [title] [message]",
-    value=
-    "Sends an announcement to the specified channel with the given title and message.",
-    inline=False)
-  embed.add_field(name="numusers",
-                  value="Displays the total number of members in the server.",
-                  inline=False)
-  embed.add_field(
-    name="activeusers",
-    value="Displays the number of active users in the last 30 days.",
-    inline=False)
-  embed.add_field(
-    name="stats",
-    value=
-    "Displays server statistics, including total members, active members in the last 30 days, total messages, unique authors, and average messages per author.",
-    inline=False)
-  embed.add_field(
-    name="messagestats",
-    value=
-    "Displays message statistics, including total messages sent, top authors by message count, and top channels by message count.",
-    inline=False)
-  embed.add_field(
-    name="ucg",
-    value=
-    "Displays a graph of the number of new users who joined the server over the last 30 days.",
-    inline=False)
-  embed.add_field(
-    name="mcg",
-    value=
-    "Displays a graph of the number of messages sent in the current channel over the last 30 days.",
-    inline=False)
+async def commandhelp(ctx, cmd: str = None):
+    if cmd is None:
+        embed = discord.Embed(title="Bot Commands", color=discord.Color.blurple())
+        embed.add_field(name="^hello", value="Greets the user who sent the command", inline=False)
+        embed.add_field(name="^announce <channel_id> <title> <message>", value="Sends an announcement message to the specified channel with the given title and message", inline=False)
+        embed.add_field(name="^numusers", value="Shows the total number of members in the server", inline=False)
+        embed.add_field(name="^activeusers", value="Shows the number of active users in the last 30 days", inline=False)
+        embed.add_field(name="^stats", value="Shows statistics about the server, such as total members, active members, total messages, unique authors, and average messages per author", inline=False)
+        embed.add_field(name="^messagestats", value="Shows statistics about the messages in the current channel, such as total messages sent, top authors, and top channels", inline=False)
+        embed.add_field(name="^ucg", value="Generates a graph of the user count over the last 30 days", inline=False)
+        await ctx.send(embed=embed)
+    else:
+        if cmd == "hello":
+            await ctx.send("Greets the user who sent the command")
+        elif cmd == "announce":
+            await ctx.send("Sends an announcement message to the specified channel with the given title and message. Usage: ^announce <channel_id> <title> <message>")
+        elif cmd == "send":
+            await ctx.send("Sends a message to the specified channel. Usage: ^send <channel_id> <message>")
+        elif cmd == "numusers":
+            await ctx.send("Shows the total number of members in the server")
+        elif cmd == "activeusers":
+            await ctx.send("Shows the number of active users in the last 30 days")
+        elif cmd == "stats":
+            await ctx.send("Shows statistics about the server, such as total members, active members, total messages, unique authors, and average messages per author")
+        elif cmd == "messagestats":
+            await ctx.send("Shows statistics about the messages in the current channel, such as total messages sent, top authors, and top channels")
+        elif cmd == "ucg":
+            await ctx.send("Generates a graph of the user count over the last 30 days")
+        else:
+            await ctx.send(f"Invalid command '{cmd}'")
 
-  await ctx.send(embed=embed)
 
 
 @bot.event
@@ -450,6 +440,33 @@ async def playaudio(ctx, channel_id: int):
 
     # disconnect from the voice channel
     await vc.disconnect()
+    
+@bot.command()
+async def giveaway(ctx, time: int, *, prize: str):
+    embed = discord.Embed(title="🎉 GIVEAWAY 🎉",
+                          description=f"React with 🎉 to enter the giveaway for {prize}!",
+                          color=discord.Color.blurple())
+    if ctx.message.attachments:
+        image_url = ctx.message.attachments[0].url
+        embed.set_image(url=image_url)
+    embed.set_footer(text=f"Giveaway ends in {time} seconds. React with 🎉 to enter!")
+    message = await ctx.send(embed=embed)
+    await message.add_reaction("🎉")
+
+    await asyncio.sleep(time)
+
+    message = await ctx.channel.fetch_message(message.id)
+    reaction = discord.utils.get(message.reactions, emoji="🎉")
+    if reaction and reaction.count > 1:
+        users = await reaction.users().flatten()
+        users.remove(bot.user)
+        winner = random.choice(users)
+        await ctx.send(f"Congratulations {winner.mention}! You won the {prize}!")
+    else:
+        await ctx.send("Sorry, there are not enough participants for the giveaway.") 
+
+
+
 
 
 # Run the bot
