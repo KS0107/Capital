@@ -5,7 +5,7 @@ from discord.ext import commands
 from datetime import datetime, timedelta
 import asyncio
 import matplotlib.pyplot as plt
-import io, time
+import io, time, sqlite3
 from collections import defaultdict
 from discord import Emoji
 
@@ -18,7 +18,6 @@ intents = discord.Intents.all()  # Include all the intents
 bot = commands.Bot(command_prefix='^', intents=intents)
 
 
-# Example command
 @bot.command()
 async def ping(ctx):
   start_time = time.monotonic()
@@ -32,8 +31,168 @@ async def ping(ctx):
   print(f"Ping, Latency: {response_time:.2f}ms")
 
   await message.edit(content=None, embed=embed)
+  
+# Connect to the database
+conn = sqlite3.connect('users.db')
+c = conn.cursor()
 
-# Another example command
+# Create a table to store user information
+c.execute('''CREATE TABLE IF NOT EXISTS users
+             (id INTEGER PRIMARY KEY, name TEXT, points INTEGER)''')
+conn.commit()
+
+
+@bot.command()
+async def addpoints(ctx, user: discord.Member, points: int):
+    # Check if user already exists in the database
+    c.execute('SELECT * FROM users WHERE id=?', (user.id,))
+    row = c.fetchone()
+    if row:
+        # Update user's points
+        c.execute('UPDATE users SET points=? WHERE id=?', (row[2] + points, user.id))
+    else:
+        # Add new user to the database
+        c.execute('INSERT INTO users VALUES (?, ?, ?)', (user.id, user.name, points))
+    conn.commit()
+    await ctx.send(f'{points} points added to {user.name}!')
+
+
+@bot.command()
+async def showpoints(ctx):
+    c.execute('SELECT * FROM users WHERE id=?', (ctx.author.id,))
+    row = c.fetchone()
+    if row:
+        await ctx.send(f'You have {row[2]} points.')
+    else:
+        await ctx.send('You have 0 points.')
+        
+
+
+@bot.command()
+async def topusers(ctx):
+    c.execute('SELECT * FROM users ORDER BY points DESC LIMIT 10')
+    rows = c.fetchall()
+    if rows:
+        embed = discord.Embed(title='Top Users', color=0xffd700)
+        for i, row in enumerate(rows):
+            embed.add_field(name=f'{i+1}. {row[1]}', value=f'{row[2]} points', inline=False)
+        await ctx.send(embed=embed)
+    else:
+        await ctx.send('No users found.')
+        
+@bot.command()
+async def helpdice(ctx):
+    embed = discord.Embed(title="🎲 Dice Rolling Game",
+                          description="Welcome to the dice rolling game! Here's how it works:\n\n\
+                          • You can roll a six-sided die and win points based on the outcome.\n\
+                          • The higher the number you roll, the more points you can win.\n\
+                          • However, the higher the multiplier you choose, the lower the chance of winning.\n\n\
+                          To play, type `^roll_dice <wager> <multiplier>`.\n\
+                          For example, if you want to wager 10 points and set the multiplier to 5, type `^roll_dice 10 5`.\n\n\
+                          Good luck and have fun!",
+                          color=discord.Color.blurple())
+    await ctx.send(embed=embed)
+
+@bot.command()
+async def roll(ctx, wager: int, multiplier: int):
+    # Check if multiplier is between 1 and 10
+    if not 1 <= multiplier <= 10:
+        await ctx.send('Multiplier should be between 1 and 10.')
+        return
+
+    # Check if user has enough points to place the wager
+    c.execute('SELECT * FROM users WHERE id=?', (ctx.author.id,))
+    row = c.fetchone()
+    if not row or row[2] < wager:
+        await ctx.send(f'You do not have enough points to place a wager of {wager} points.')
+        return
+
+    # Calculate the odds of winning based on the multiplier
+    win_odds = 1 / multiplier
+
+    # Roll the dice and determine the outcome based on the roll and the win odds
+    roll = random.random()
+    if roll < win_odds:
+        outcome = f'You won {multiplier * wager} points!'
+        winnings = multiplier * wager
+    else:
+        outcome = 'You lost the wager.'
+        winnings = -wager
+
+    # Update the user's points and send the outcome message
+    c.execute('UPDATE users SET points=? WHERE id=?', (row[2] + winnings, ctx.author.id))
+    conn.commit()
+
+    # Create an embed to display the outcome
+    embed = discord.Embed(title='Roll Result', color=0xffd500)
+    embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.avatar_url)
+    embed.set_thumbnail(url='https://www.freepnglogos.com/uploads/dice-png/dice-transparent-png-pictures-icons-and-png-backgrounds-0.png')
+
+    # Add fields to the embed to show the outcome, the roll result and the winning odds
+    embed.add_field(name='Outcome', value=outcome, inline=False)
+    embed.add_field(name='Roll Result', value=f'{round(roll*6)+1}/6', inline=False)
+    embed.add_field(name='Winning Odds', value=f'1 in {multiplier:.0f}', inline=False)
+    embed.add_field(name='Previous Balance', value=f'{row[2]:,}', inline=True)
+    embed.add_field(name='Current Balance', value=f'{row[2] + winnings:,}', inline=True)
+
+    await ctx.send(embed=embed)
+# Close the database connection when the bot is stopped
+@bot.event
+async def on_bot_disconnect():
+    conn.close()
+    
+@bot.command()
+async def pick(ctx):
+    """Pick up any dropped coins in chat."""
+    c.execute('SELECT * FROM users WHERE id=?', (ctx.author.id,))
+    row = c.fetchone()
+    if not row:
+        await ctx.send('You do not have any points yet.')
+        return
+
+    # Check if there are any dropped coins available to pick up
+    if not dropped_coins:
+        await ctx.send('There are no dropped coins at the moment.')
+        return
+
+    # Pick up a random dropped coin
+    dropped_coin = random.choice(dropped_coins)
+    c.execute('UPDATE users SET points=? WHERE id=?', (row[2] + dropped_coin, ctx.author.id))
+    conn.commit()
+
+    # Remove the picked up coin from the list of dropped coins
+    dropped_coins.remove(dropped_coin)
+
+    # Send the success message
+    await ctx.send(f"You picked up {dropped_coin} points! You now have {row[2] + dropped_coin} points.")
+
+async def drop_coins():
+    """Drop coins in chat at random times of the day."""
+    while True:
+        # Wait for a random amount of time between 1 and 3 hours
+        await asyncio.sleep(random.randint(3600, 10800))
+
+        # Drop a random amount of coins between 300 and 1000
+        dropped_coin = random.randint(300, 1000)
+        dropped_coins.append(dropped_coin)
+
+        # Loop through every guild the bot is a member of
+        for guild in bot.guilds:
+            # Loop through every text channel in the guild
+            for channel in guild.text_channels:
+                # Send the dropped coin message in chat
+                await channel.send(f'A coin worth {dropped_coin} points has been dropped in chat in {guild.name}! Type "^pick" to claim it.')
+
+
+# Initialize the list of dropped coins
+dropped_coins = []
+
+# Start the drop coins loop as a background task
+bot.loop.create_task(drop_coins())
+    
+############################################################################################################
+
+
 @bot.command()
 async def hello(ctx):
   await ctx.send(f'Hello, {ctx.author.mention}!')
@@ -337,6 +496,8 @@ async def on_message(message):
   await bot.process_commands(message)
 
 
+# Moderation commands
+
 @bot.command()
 @commands.has_role("Mod")
 async def manage(ctx, action, user_id: int, *, reason):
@@ -360,6 +521,15 @@ async def manage(ctx, action, user_id: int, *, reason):
       "Invalid action. Please enter either 'kick' or 'ban' as the first argument."
     )
     return
+
+@bot.command()
+@commands.has_role("Mod")
+async def timeout(ctx, member: discord.Member, time: int):
+    await member.edit(mute=True)
+    await ctx.send(f"{member.display_name} has been muted for {time} minutes.")
+    await asyncio.sleep(time * 60)
+    await member.edit(mute=False)
+    await ctx.send(f"{member.display_name} has been unmuted.")
 
 @bot.command()
 async def purge(ctx, num_messages: int):
@@ -465,7 +635,56 @@ async def giveaway(ctx, time: int, *, prize: str):
     else:
         await ctx.send("Sorry, there are not enough participants for the giveaway.") 
 
+@bot.command()
+async def drink(ctx, amount):
+    try:
+        total_amount = float(amount)
+        if total_amount <= 0:
+            await ctx.send("Please enter a valid amount of water to drink.")
+            return
+    except ValueError:
+        await ctx.send("Please enter a valid amount of water to drink.")
+        return
 
+    water_per_hour = total_amount / 12
+    reminder_interval = 3600 // 12 # interval is constant
+    reminders = []
+
+    for i in range(1, 13):
+        reminder_time = reminder_interval * i
+        reminder_amount = round(water_per_hour, 2)
+        reminders.append((reminder_time, reminder_amount))
+        total_amount -= reminder_amount
+    print(reminders)
+    await ctx.send(f"You need to drink {amount} liters of water in the next 12 hours.")
+    await asyncio.sleep(reminder_interval)
+
+    for reminder in reminders:
+        await ctx.send(f"**Reminder:** Drink {reminder[1]}L of water.")
+        await asyncio.sleep(reminder_interval)
+
+    await ctx.send("You've reached your goal for the day! Good job!")
+
+@bot.command()
+async def assign_roles(ctx, *, title):
+    embed = discord.Embed(title=title, color=0x00ff00)
+    embed.add_field(name="React with 🔵 for CSGO role.", value="React with 🔴 for Fortnite role.")
+
+    msg = await ctx.send(embed=embed)
+    await msg.add_reaction('🔵')
+    await msg.add_reaction('🔴')
+
+@bot.event
+async def on_reaction_add(reaction, user):
+    if user.bot:
+        return
+
+    if str(reaction.emoji) == '🔵':
+        role = discord.utils.get(reaction.message.guild.roles, name="CSGO")
+        await user.add_roles(role)
+    elif str(reaction.emoji) == '🔴':
+        role = discord.utils.get(reaction.message.guild.roles, name="Fortnite")
+        await user.add_roles(role)
 
 
 
