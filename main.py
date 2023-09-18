@@ -10,8 +10,7 @@ from collections import defaultdict
 from discord import Emoji
 
 # Put your bot token here:
-TOKEN = "MTA5NTc5NDE4MDA0NDg4MjA4Mg.GCZRfu.x7OhE1qkstqgitYMNh3IDKGRSWZopY2PZ34O_s"
-
+TOKEN = "MTA5NTc5NDE4MDA0NDg4MjA4Mg.Gro9B1.I7o8lFmBQWtZ-pTWMSTJGeEeT2eLaAuwMM1PPA"
 print("Starting bot...")
 # Set up the bot client
 intents = discord.Intents.all()  # Include all the intents
