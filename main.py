@@ -443,7 +443,7 @@ async def on_ready():
 
 
 # List of blocked words
-blocked_words = ["retard", "shit", "fuck","cunt"]
+blocked_words = []
 
 
 # Event listener for message creation
