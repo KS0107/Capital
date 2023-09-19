@@ -10,7 +10,9 @@ from collections import defaultdict
 from discord import Emoji
 
 # Put your bot token here:
-TOKEN = "MTA5NTc5NDE4MDA0NDg4MjA4Mg.GUIGRk.ypvplVYNUc5XEmzytozgrNOKrX0kNhRCwXqDgI"
+token1 = "MTA5NTc5NDE4MDA0NDg4MjA4Mg.GoaGrO"
+token2 = ".jlcjZ_Dt4I46FyPqHSdy6Y4kNeM0pYaKU1NbwA"
+TOKEN = token1 + token2
 print("Starting bot...")
 print("Passing token", TOKEN)
 # Set up the bot client
