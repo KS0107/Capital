@@ -8,11 +8,10 @@ import matplotlib.pyplot as plt
 import io, time, sqlite3
 from collections import defaultdict
 from discord import Emoji
+import os
 
 # Put your bot token here:
-token1 = "MTA5NTc5NDE4MDA0NDg4MjA4Mg.GoaGrO"
-token2 = ".jlcjZ_Dt4I46FyPqHSdy6Y4kNeM0pYaKU1NbwA"
-TOKEN = token1 + token2
+TOKEN = os.environ['BOT_TOKEN']
 print("Starting bot...")
 print("Passing token", TOKEN)
 # Set up the bot client
